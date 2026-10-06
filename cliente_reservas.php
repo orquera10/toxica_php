@@ -8,19 +8,6 @@ include __DIR__ . '/header.php';
 
 $canchas = mysqli_query($con, "SELECT _id, NOMBRE, PRECIO FROM canchas WHERE _id NOT IN (9, 10) ORDER BY NOMBRE");
 
-$tarifas_cliente = [];
-foreach ($canchas as $cancha_tarifa) {
-    $tarifas_cliente[(int) $cancha_tarifa['_id']] = [
-        'base' => (float) $cancha_tarifa['PRECIO'],
-        'reglas' => precios_horarios_cancha($con, (int) $cancha_tarifa['_id']),
-        'inicios_cumple' => (int) $cancha_tarifa['_id'] === CANCHA_CUMPLE_ID
-            ? array_combine(range(1, 7), array_map(function ($dia) { return horarios_inicio_cumpleanios_cliente(date('Y-m-d', strtotime('monday this week +' . ($dia - 1) . ' days'))); }, range(1, 7)))
-            : [],
-        'horarios' => horarios_semanales_cancha($con, (int) $cancha_tarifa['_id']),
-    ];
-}
-$canchas->data_seek(0);
-
 $cliente_id = (int) $cliente['_id'];
 $turnos_por_pagina = 5;
 $pagina_actual = max(1, (int) ($_GET['pagina'] ?? 1));
@@ -63,6 +50,11 @@ function fecha_cliente_turno($fecha, $hora_inicio)
 }
 ?>
 
+<style>
+    .cliente-slot-btn .cliente-slot-precio,
+    .cliente-slot-btn small { display: block; }
+    .cliente-slot-btn.cliente-slot-promo { border: 2px solid #77df98; }
+</style>
 <main class="container cliente-page py-4">
     <div class="row">
         <div class="col-12">
@@ -117,7 +109,6 @@ function fecha_cliente_turno($fecha, $hora_inicio)
                             <?php endwhile; ?>
                         </select>
                     </div>
-                    <?php include __DIR__ . '/cliente_calendario_precios.php'; ?>
                     <div class="cliente-disponibilidad mb-4">
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <h3>Horarios disponibles</h3>
@@ -324,7 +315,7 @@ include __DIR__ . '/cliente_form_utils.php';
                     if (slot.total < slot.total_base) {
                         button.classList.add('cliente-slot-promo');
                         const promo = document.createElement('small');
-                        promo.textContent = 'Promo ? ahorr?s ' + new Intl.NumberFormat('es-AR', {style: 'currency', currency: 'ARS', maximumFractionDigits: 2}).format(slot.total_base - slot.total);
+                        promo.textContent = 'Promo \u00b7 ahorr\u00e1s ' + new Intl.NumberFormat('es-AR', {style: 'currency', currency: 'ARS', maximumFractionDigits: 2}).format(slot.total_base - slot.total);
                         button.appendChild(promo);
                     }
                     button.dataset.inicio = slot.inicio;
