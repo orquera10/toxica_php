@@ -1,0 +1,53 @@
+#modalPrecios { color: #162426; }
+#modalPrecios .modal-dialog { max-width: 960px; }
+#modalPrecios .modal-content { background: #f9f5d2; border: 0; border-radius: 18px; overflow: hidden; box-shadow: 0 24px 70px #0006; }
+#modalPrecios .modal-header { align-items: flex-start; padding: 22px 24px; background: #162426; border-bottom: 4px solid #fcc30c; }
+#modalPrecios .modal-title { color: #fcc30c; font-size: 1.35rem; }
+#modalPrecios .precios-subtitulo { margin: 5px 0 0; color: #f9f5d2; font-size: .9rem; }
+#modalPrecios .btn-close { filter: invert(1) grayscale(100%) brightness(200%); opacity: .9; padding: 12px; }
+#modalPrecios .modal-body { padding: 24px; }
+#modalPrecios .precios-intro { margin: 0 0 16px; color: #315257; line-height: 1.5; }
+#modalPrecios .precios-ayuda { padding: 12px 16px; margin-bottom: 18px; background: #fffdf0; border-left: 4px solid #fcc30c; border-radius: 8px; }
+#modalPrecios .precios-ayuda p { margin: 0; color: #315257; font-size: .85rem; line-height: 1.5; }
+#modalPrecios .precios-ayuda #ayudaPrecioUnidad { color: #162426; font-weight: 700; margin-bottom: 5px; }
+#modalPrecios .table { --bs-table-bg: transparent; --bs-table-color: #162426; --bs-table-border-color: #d8dcc9; margin: 0 0 12px; }
+#modalPrecios .table th { padding: 10px 8px; color: #315257; font-size: .8rem; font-weight: 800; border-bottom: 2px solid #ccd1bc; }
+#modalPrecios .table td { padding: 12px 8px; background: transparent; box-shadow: none; }
+#modalPrecios .form-select, #modalPrecios .form-control { min-height: 44px; color: #162426; background-color: #fff !important; border: 1px solid #9aaea8 !important; border-radius: 8px; font-size: .95rem; }
+#modalPrecios .form-control { font-weight: 700; }
+#modalPrecios .form-select:focus, #modalPrecios .form-control:focus { border-color: #315257 !important; box-shadow: 0 0 0 3px #fcc30c66; }
+#modalPrecios .precio-moneda { position: relative; }
+#modalPrecios .precio-moneda span { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #315257; font-weight: 700; pointer-events: none; }
+#modalPrecios .precio-moneda input { padding-left: 28px; width: 100%; min-width: 130px; }
+#modalPrecios .precio-campo-label { display: none; }
+#modalPrecios .precios-vacio { margin-bottom: 16px; padding: 24px 16px; border: 1px dashed #819790; border-radius: 12px; text-align: center; color: #315257; }
+#modalPrecios .precios-vacio strong { display: block; color: #162426; margin-bottom: 4px; }
+#modalPrecios .precios-vacio p { margin: 0; font-size: .9rem; }
+#modalPrecios .btn { min-height: 42px; border-radius: 8px; font-weight: 700; box-shadow: none; }
+#modalPrecios .precios-agregar { color: #162426; border: 1px solid #315257; background: transparent; }
+#modalPrecios .precios-agregar:hover { color: #fff; background: #315257; }
+#modalPrecios .precios-quitar { color: #a92d27; border: 1px solid #d6a29a; background: #fff7f4; }
+#modalPrecios .precios-quitar:hover { background: #a92d27; border-color: #a92d27; color: #fff; }
+#modalPrecios .precios-nota { margin: 16px 0 0; color: #315257; font-size: .8rem; line-height: 1.5; }
+#modalPrecios .modal-footer { padding: 16px 24px; background: #eeeacb; border-top: 1px solid #d1d5be; gap: 8px; }
+#modalPrecios .precios-cancelar { background: transparent; color: #315257; border: 1px solid #899d93; }
+#modalPrecios .precios-cancelar:hover { background: #dedfc8; color: #162426; }
+#modalPrecios .precios-guardar { background: #fcc30c; border: 1px solid #162426; color: #162426; padding-inline: 24px; }
+#modalPrecios .precios-guardar:hover { background: #e4b00a; }
+#modalPrecios .btn:focus-visible { outline: 3px solid #315257; outline-offset: 3px; }
+@media (max-width: 767.98px) {
+    #modalPrecios .modal-dialog { margin: 12px; }
+    #modalPrecios .modal-header, #modalPrecios .modal-body { padding: 18px 16px; }
+    #modalPrecios .modal-title { font-size: 1.2rem; }
+    #modalPrecios .table-responsive { overflow: visible; }
+    #modalPrecios table, #modalPrecios tbody { display: block; width: 100%; }
+    #modalPrecios thead { display: none; }
+    #modalPrecios tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-bottom: 14px; padding: 14px; background: #fffdf0; border: 1px solid #d1d5be; border-radius: 12px; }
+    #modalPrecios .table td { display: block; min-width: 0; padding: 0; border: 0; }
+    #modalPrecios .table td:first-child, #modalPrecios .table td:nth-child(4) { grid-column: 1 / -1; }
+    #modalPrecios .table td:last-child { grid-column: 1 / -1; text-align: right; }
+    #modalPrecios .precio-campo-label { display: block; margin-bottom: 5px; color: #315257; font-size: .8rem; font-weight: 700; }
+    #modalPrecios .precios-agregar { width: 100%; }
+    #modalPrecios .modal-footer { padding: 14px 16px; display: grid; grid-template-columns: 1fr 1fr; }
+    #modalPrecios .modal-footer .btn { width: 100%; margin: 0; padding-inline: 8px; }
+}

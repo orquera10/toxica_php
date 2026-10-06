@@ -4,19 +4,20 @@ foreach ($canchas as $cancha_precio) {
     $precios_por_cancha[(int) $cancha_precio['_id']] = precios_horarios_cancha($con, (int) $cancha_precio['_id']);
 }
 ?>
+<link rel="stylesheet" href="css/precios_horarios.css?v=1">
 <div class="modal fade" id="modalPrecios" tabindex="-1" aria-labelledby="tituloPrecios" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered"><div class="modal-content">
-        <div class="modal-header"><h5 class="modal-title" id="tituloPrecios">Precios por horario — <span id="nombreCanchaPrecios"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
+        <div class="modal-header"><div><h5 class="modal-title" id="tituloPrecios">Precios por horario</h5><p class="precios-subtitulo" id="nombreCanchaPrecios"></p></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
         <form id="formPreciosHorarios">
             <div class="modal-body">
-                <p>Agregá precios especiales por día y horario. Fuera de estas franjas se aplica el precio base. Las franjas se repiten todas las semanas.</p>
-                <p id="ayudaPrecioUnidad"></p>
-                <p>Ejemplo: lunes de 13:00 a 17:00 con un precio menor. Las horas de madrugada (00:00 a 02:00) corresponden a la noche del día elegido.</p>
-                <div class="table-responsive"><table class="table align-middle"><thead><tr><th>Día</th><th>Desde</th><th>Hasta</th><th>Precio ($)</th><th></th></tr></thead><tbody id="filasPrecios"></tbody></table></div>
-                <button type="button" class="btn btn-outline-primary" id="agregarFranjaPrecio">Agregar franja</button>
-                <p class="mt-3 mb-0">Para volver al precio base, quitá la franja y guardá. Los turnos ya registrados conservan su importe.</p>
+                <p class="precios-intro">Defin&iacute; tarifas especiales para cada d&iacute;a y horario. Se repiten cada semana; fuera de esas franjas se cobra el precio base.</p>
+                <div class="precios-ayuda"><p id="ayudaPrecioUnidad"></p><p>La madrugada (00:00 a 02:00) pertenece a la noche del d&iacute;a elegido.</p></div>
+                <div class="table-responsive"><table class="table align-middle"><thead><tr><th>Día</th><th>Desde</th><th>Hasta</th><th>Precio ($)</th><th><span class="visually-hidden">Acciones</span></th></tr></thead><tbody id="filasPrecios"></tbody></table></div>
+                <div class="precios-vacio" id="preciosVacio"><strong>Esta cancha usa el precio base</strong><p>Agreg&aacute; una franja para ofrecer, por ejemplo, una promo los lunes a la siesta.</p></div>
+                <button type="button" class="btn precios-agregar" id="agregarFranjaPrecio"><span aria-hidden="true">+</span> Agregar franja</button>
+                <p class="precios-nota">Para volver al precio base, quitá la franja y guardá. Los turnos ya registrados conservan su importe.</p>
             </div>
-            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button type="submit" class="btn btn-success">Guardar precios</button></div>
+            <div class="modal-footer"><button type="button" class="btn precios-cancelar" data-bs-dismiss="modal">Cancelar</button><button type="submit" class="btn precios-guardar">Guardar precios</button></div>
         </form>
     </div></div>
 </div>
@@ -26,6 +27,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const csrf = <?= json_encode($_SESSION['csrf_precios']) ?>;
     const modal = new bootstrap.Modal(document.getElementById('modalPrecios'));
     const filas = document.getElementById('filasPrecios');
+    const vacio = document.getElementById('preciosVacio');
+    const actualizarVacio = () => { vacio.hidden = filas.children.length > 0; };
     let canchaId;
     const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
     function agregar(regla = {dia_semana: 1, inicio: 780, fin: 1020, precio: ''}) {
@@ -38,14 +41,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return html;
         };
-        tr.innerHTML = `<td><select class="form-select dia" aria-label="Día">${dias.map((d,i) => `<option value="${i+1}" ${i+1 === Number(regla.dia_semana) ? 'selected' : ''}>${d}</option>`).join('')}</select></td>
-            <td><select class="form-select inicio" aria-label="Desde">${opcionesHora(regla.inicio)}</select></td>
-            <td><select class="form-select fin" aria-label="Hasta">${opcionesHora(regla.fin)}</select></td>
-            <td><input class="form-control precio" aria-label="Precio" type="number" min="0.01" max="9999999999.99" step="0.01" required style="min-width:120px"></td>
-            <td><button type="button" class="btn btn-outline-danger">Quitar</button></td>`;
+        tr.innerHTML = `<td><span class="precio-campo-label">D&iacute;a</span><select class="form-select dia" aria-label="Día">${dias.map((d,i) => `<option value="${i+1}" ${i+1 === Number(regla.dia_semana) ? 'selected' : ''}>${d}</option>`).join('')}</select></td>
+            <td><span class="precio-campo-label">Desde</span><select class="form-select inicio" aria-label="Desde">${opcionesHora(regla.inicio)}</select></td>
+            <td><span class="precio-campo-label">Hasta</span><select class="form-select fin" aria-label="Hasta">${opcionesHora(regla.fin)}</select></td>
+            <td><span class="precio-campo-label">Precio</span><div class="precio-moneda"><span aria-hidden="true">$</span><input class="form-control precio" aria-label="Precio" type="number" min="0.01" max="9999999999.99" step="0.01" required placeholder="0,00"></div></td>
+            <td><button type="button" class="btn precios-quitar">Quitar</button></td>`;
         tr.querySelector('.precio').value = regla.precio;
-        tr.querySelector('button').addEventListener('click', () => tr.remove());
+        tr.querySelector('button').addEventListener('click', () => { tr.remove(); actualizarVacio(); });
         filas.appendChild(tr);
+        actualizarVacio();
     }
     document.querySelectorAll('.btn-precios-horarios').forEach(boton => boton.addEventListener('click', () => {
         canchaId = boton.dataset.canchaId;
@@ -55,6 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
             : 'Los precios son por hora. Si un turno cruza franjas, se calcula cada parte con su precio correspondiente.';
         filas.replaceChildren();
         (precios[canchaId] || []).forEach(agregar);
+        actualizarVacio();
         modal.show();
     }));
     document.getElementById('agregarFranjaPrecio').addEventListener('click', () => agregar());
