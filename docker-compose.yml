@@ -1,0 +1,20 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8001:80"
+    environment:
+      DB_HOST: 192.168.1.25
+      DB_PORT: 3306
+      DB_NAME: la_toxica
+      DB_USER: root
+      DB_PASSWORD: ""
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOST: 192.168.1.25
+      PMA_PORT: 3306
+      UPLOAD_LIMIT: 128M

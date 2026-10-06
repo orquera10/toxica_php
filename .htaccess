@@ -1,0 +1,11 @@
+<FilesMatch "^(config|configBkp)\.php$">
+    Require all denied
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+<FilesMatch "^(\.env|composer\.(json|lock)|.*\.(bak|backup|sql|log))$">
+    Require all denied
+    Order allow,deny
+    Deny from all
+</FilesMatch>

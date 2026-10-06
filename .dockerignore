@@ -1,0 +1,7 @@
+.git
+.agents
+.codex
+php-client-server.out.log
+php-client-server.err.log
+*.log
+*.sql
