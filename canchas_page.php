@@ -85,19 +85,20 @@ if (mysqli_num_rows($result) > 0) {
                         <h5 class="card-title"><?php echo $cancha['NOMBRE']; ?></h5>
                         <p class="card-text"><?php echo $cancha['DESCRIPCION']; ?></p>
 
-                        <div class="form-group row align-items-center">
-                            <div class="col-4">
-                                <label for="precio_<?php echo $cancha['_id']; ?>" class="mb-0">Precio base:</label>
-                            </div>
-                            <div class="col-8">
+                        <div class="cancha-precio-base">
+                            <label for="precio_<?php echo $cancha['_id']; ?>">Precio base</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
                                 <input type="number" class="form-control" id="precio_<?php echo $cancha['_id']; ?>"
                                     value="<?php echo $cancha['PRECIO']; ?>">
                             </div>
+                            <button type="button" class="btn btn-primary btn-modificar-precio"
+                                data-cancha-id="<?php echo $cancha['_id']; ?>"><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Guardar precio base</button>
                         </div>
-                        <button class="btn btn-primary btn-modificar-precio mt-4"
-                            data-cancha-id="<?php echo $cancha['_id']; ?>">Modificar</button>
-                        <button type="button" class="btn btn-primary btn-precios-horarios mt-3" data-cancha-id="<?php echo (int) $cancha['_id']; ?>" data-cancha-nombre="<?php echo htmlspecialchars($cancha['NOMBRE'], ENT_QUOTES, 'UTF-8'); ?>">Precios por horario</button>
-                        <button class="btn btn-success btn-horarios mt-4" data-cancha-id="<?php echo $cancha['_id']; ?>" data-cancha-nombre="<?php echo htmlspecialchars($cancha['NOMBRE'], ENT_QUOTES, 'UTF-8'); ?>">Horarios</button>
+                        <div class="cancha-configuracion">
+                            <button type="button" class="btn btn-precios-horarios" data-cancha-id="<?php echo (int) $cancha['_id']; ?>" data-cancha-nombre="<?php echo htmlspecialchars($cancha['NOMBRE'], ENT_QUOTES, 'UTF-8'); ?>"><i class="fa-solid fa-tags" aria-hidden="true"></i> Precios por horario</button>
+                            <button type="button" class="btn btn-success btn-horarios" data-cancha-id="<?php echo $cancha['_id']; ?>" data-cancha-nombre="<?php echo htmlspecialchars($cancha['NOMBRE'], ENT_QUOTES, 'UTF-8'); ?>"><i class="fa-regular fa-clock" aria-hidden="true"></i> Horarios</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -106,6 +107,67 @@ if (mysqli_num_rows($result) > 0) {
 </div>
 
 <style>
+    .tarjetasCanchas .cancha-precio-base label {
+        display: block;
+        margin-bottom: .45rem;
+        color: var(--color-secundario);
+        font-size: .85rem;
+        font-weight: 700;
+    }
+    .tarjetasCanchas .cancha-precio-base .input-group-text {
+        color: var(--color-terciario);
+        background: #fff;
+        border-color: #9aaea8;
+        font-weight: 700;
+    }
+    .tarjetasCanchas .cancha-precio-base input {
+        min-width: 0;
+        color: var(--color-secundario);
+        background: #fff;
+        border-color: #9aaea8;
+        font-weight: 700;
+    }
+    .tarjetasCanchas .cancha-precio-base input:focus {
+        border-color: var(--color-terciario);
+        box-shadow: 0 0 0 .2rem rgba(252, 195, 12, .25);
+    }
+    .tarjetasCanchas .cancha-precio-base .btn { margin-top: .65rem; }
+    .tarjetasCanchas .cancha-configuracion {
+        display: grid;
+        gap: .6rem;
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid rgba(49, 82, 87, .22);
+    }
+    .tarjetasCanchas .card .btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: .5rem;
+        width: 100%;
+        min-height: 42px;
+        padding: .55rem .65rem;
+        border-radius: 8px;
+        font-size: .82rem;
+        font-weight: 700;
+        box-shadow: none;
+    }
+    .tarjetasCanchas .card .btn-precios-horarios {
+        color: var(--color-terciario);
+        background: transparent;
+        border: 1px solid var(--color-terciario);
+    }
+    .tarjetasCanchas .card .btn-precios-horarios:hover,
+    .tarjetasCanchas .card .btn-precios-horarios:active {
+        color: #fff;
+        background: var(--color-terciario);
+        border-color: var(--color-terciario);
+    }
+    .tarjetasCanchas .btn:focus-visible {
+        outline: 3px solid var(--color-terciario);
+        outline-offset: 3px;
+    }
+
     .configuracion-reservas {
         position: relative;
         overflow: hidden;
