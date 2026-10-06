@@ -39,10 +39,11 @@ if (!reserva_dentro_del_plazo($fecha_input, $id_cancha)) {
     exit;
 }
 
-$stmt_cancha = $con->prepare("SELECT _id FROM canchas WHERE _id = ? AND _id != 9");
+$stmt_cancha = $con->prepare("SELECT _id, PRECIO FROM canchas WHERE _id = ? AND _id != 9");
 $stmt_cancha->bind_param("i", $id_cancha);
 $stmt_cancha->execute();
-$cancha_existe = $stmt_cancha->get_result()->num_rows > 0;
+$cancha_precio = $stmt_cancha->get_result()->fetch_assoc();
+$cancha_existe = (bool) $cancha_precio;
 $stmt_cancha->close();
 
 if (!$cancha_existe) {
@@ -54,6 +55,8 @@ if (!$cancha_existe) {
     exit;
 }
 
+$reglas_precio = precios_horarios_cancha($con, $id_cancha);
+$total_base = (float) $cancha_precio['PRECIO'] * ($id_cancha === CANCHA_CUMPLE_ID ? 1 : $duracion);
 $fecha = date('d-m-Y', $fecha_ts);
 $slots = [];
 $franjas_horario = limites_franjas_horario_cancha($con, $id_cancha, $fecha_input);
@@ -125,6 +128,8 @@ foreach ($inicios_minutos as $inicio_minutos) {
     if (!$ocupado) {
         $es_madrugada = date('Y-m-d', $inicio_ts) !== $fecha_input;
         $slots[] = [
+            'total' => calcular_precio_turno($reglas_precio, $cancha_precio['PRECIO'], date('Y-m-d', $inicio_ts), $hora_inicio, $duracion, $id_cancha === CANCHA_CUMPLE_ID),
+            'total_base' => $total_base,
             'inicio' => $hora_inicio,
             'fin' => $hora_fin,
             'fecha' => date('Y-m-d', $inicio_ts),

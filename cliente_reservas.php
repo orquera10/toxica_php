@@ -8,6 +8,19 @@ include __DIR__ . '/header.php';
 
 $canchas = mysqli_query($con, "SELECT _id, NOMBRE, PRECIO FROM canchas WHERE _id NOT IN (9, 10) ORDER BY NOMBRE");
 
+$tarifas_cliente = [];
+foreach ($canchas as $cancha_tarifa) {
+    $tarifas_cliente[(int) $cancha_tarifa['_id']] = [
+        'base' => (float) $cancha_tarifa['PRECIO'],
+        'reglas' => precios_horarios_cancha($con, (int) $cancha_tarifa['_id']),
+        'inicios_cumple' => (int) $cancha_tarifa['_id'] === CANCHA_CUMPLE_ID
+            ? array_combine(range(1, 7), array_map(function ($dia) { return horarios_inicio_cumpleanios_cliente(date('Y-m-d', strtotime('monday this week +' . ($dia - 1) . ' days'))); }, range(1, 7)))
+            : [],
+        'horarios' => horarios_semanales_cancha($con, (int) $cancha_tarifa['_id']),
+    ];
+}
+$canchas->data_seek(0);
+
 $cliente_id = (int) $cliente['_id'];
 $turnos_por_pagina = 5;
 $pagina_actual = max(1, (int) ($_GET['pagina'] ?? 1));
@@ -99,11 +112,12 @@ function fecha_cliente_turno($fecha, $hora_inicio)
                             <?php while ($cancha = mysqli_fetch_assoc($canchas)): ?>
                                 <option value="<?php echo (int) $cancha['_id']; ?>">
                                     <?php echo htmlspecialchars(nombre_cancha_cliente($cancha['_id'], $cancha['NOMBRE'])); ?> -
-                                    $<?php echo number_format((float) $cancha['PRECIO'], 0, ',', '.'); ?><?php echo (int) $cancha['_id'] === 8 ? '/3 hs' : '/h'; ?>
+                                    $<?php echo number_format((float) $cancha['PRECIO'], 0, ',', '.'); ?><?php echo (int) $cancha['_id'] === 8 ? '/3 hs' : '/h'; ?> (base)
                                 </option>
                             <?php endwhile; ?>
                         </select>
                     </div>
+                    <?php include __DIR__ . '/cliente_calendario_precios.php'; ?>
                     <div class="cliente-disponibilidad mb-4">
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <h3>Horarios disponibles</h3>
@@ -263,7 +277,9 @@ include __DIR__ . '/cliente_form_utils.php';
         document.getElementById('fecha_reserva').value = '';
     }
 
+    let consultaDisponibilidad = 0;
     function cargarDisponibilidad() {
+        const consulta = ++consultaDisponibilidad;
         const fecha = fechaInput.value;
         const cancha = canchaInput.value;
         const duracion = cancha === '8' ? '3' : duracionInput.value;
@@ -278,6 +294,7 @@ include __DIR__ . '/cliente_form_utils.php';
         fetch(`disponibilidad_cliente.php?fecha=${encodeURIComponent(fecha)}&cancha=${encodeURIComponent(cancha)}&duracion=${encodeURIComponent(duracion)}`)
             .then(response => response.json())
             .then(data => {
+                if (consulta !== consultaDisponibilidad) return;
                 slotsDisponibles.innerHTML = '';
 
                 if (!data.success) {
@@ -297,7 +314,19 @@ include __DIR__ . '/cliente_form_utils.php';
                     const button = document.createElement('button');
                     button.type = 'button';
                     button.className = 'cliente-slot-btn';
-                    button.textContent = slot.label;
+                    const horario = document.createElement('span');
+                    horario.textContent = slot.label;
+                    button.appendChild(horario);
+                    const precio = document.createElement('strong');
+                    precio.className = 'cliente-slot-precio';
+                    precio.textContent = new Intl.NumberFormat('es-AR', {style: 'currency', currency: 'ARS', maximumFractionDigits: 2}).format(slot.total) + ' total';
+                    button.appendChild(precio);
+                    if (slot.total < slot.total_base) {
+                        button.classList.add('cliente-slot-promo');
+                        const promo = document.createElement('small');
+                        promo.textContent = 'Promo ? ahorr?s ' + new Intl.NumberFormat('es-AR', {style: 'currency', currency: 'ARS', maximumFractionDigits: 2}).format(slot.total_base - slot.total);
+                        button.appendChild(promo);
+                    }
                     button.dataset.inicio = slot.inicio;
                     button.dataset.fecha = slot.fecha;
 
@@ -312,6 +341,7 @@ include __DIR__ . '/cliente_form_utils.php';
                 });
             })
             .catch(() => {
+                if (consulta !== consultaDisponibilidad) return;
                 limpiarSlots('No se pudo consultar');
             });
     }
@@ -320,6 +350,7 @@ include __DIR__ . '/cliente_form_utils.php';
         fechaInput.max = canchaInput.value === '8'
             ? fechaInput.dataset.maxCumple
             : fechaInput.dataset.maxTurno;
+        if (fechaInput.value > fechaInput.max) fechaInput.value = fechaInput.max;
     }
 
     fechaInput.addEventListener('change', cargarDisponibilidad);
