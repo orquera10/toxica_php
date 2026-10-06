@@ -81,3 +81,15 @@ al usar esta configuraci?n; el usuario MySQL debe tener permiso para crear tabla
 Pruebas del c?lculo: `php tests/precios_canchas_test.php`.
 
 El webhook de WhatsApp requiere `WHATSAPP_WEBHOOK_VERIFY_TOKEN` en el entorno del servidor; no contiene una clave predeterminada.
+
+## Tarifas por horario para el bot
+
+`wp_reservas_api.php?action=disponibilidad` incluye en cada horario `total`,
+`total_base` y `minimo_senia`, calculados para la duración solicitada. La madrugada
+usa la jornada anterior, igual que las reservas web. Para cumpleaños, el total
+corresponde al paquete completo según su hora de inicio.
+
+`action=canchas` conserva `precio` como tarifa base e incorpora
+`tiene_precios_horarios`. Al crear una reserva, el servidor vuelve a calcular
+el importe y la seña; el bot no debe enviar un precio calculado por su cuenta.
+Actualizar también el bot para que muestre estos importes antes del pago.

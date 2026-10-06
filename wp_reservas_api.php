@@ -646,10 +646,13 @@ function api_slots_disponibles($fecha_input, $id_cancha, $duracion)
         return [false, mensaje_plazo_reserva($id_cancha), []];
     }
 
-    if (!api_cancha($id_cancha)) {
+    $cancha = api_cancha($id_cancha);
+    if (!$cancha) {
         return [false, 'Cancha no disponible.', []];
     }
 
+    $reglas_precio = precios_horarios_cancha($con, $id_cancha);
+    $total_base = (float) $cancha['PRECIO'] * ($id_cancha === CANCHA_CUMPLE_ID ? 1 : $duracion);
     $slots = [];
     $franjas_horario = limites_franjas_horario_cancha($con, $id_cancha, $fecha_input);
     if (count($franjas_horario) === 0) return [true, '', []];
@@ -689,7 +692,11 @@ function api_slots_disponibles($fecha_input, $id_cancha, $duracion)
         if (!reserva_en_horario_habil_cancha($con, $id_cancha, $fecha_input, $hora_inicio, $duracion)) continue;
         $es_madrugada = date('Y-m-d', $inicio_ts) !== date('Y-m-d', $fecha_ts);
 
+        $total = calcular_precio_turno($reglas_precio, $cancha['PRECIO'], date('Y-m-d', $inicio_ts), $hora_inicio, $duracion, $id_cancha === CANCHA_CUMPLE_ID);
         $slots[] = [
+            'total' => $total,
+            'total_base' => $total_base,
+            'minimo_senia' => minimo_senia_reserva($con, $total, $id_cancha, date('Y-m-d', $inicio_ts), $hora_inicio),
             'fecha' => date('Y-m-d', $inicio_ts),
             'inicio' => $hora_inicio,
             'fin' => $hora_fin,
@@ -714,6 +721,7 @@ function api_listar_canchas()
             'nombre' => nombre_cancha_cliente($id, $cancha['NOMBRE']),
             'precio' => (float) $cancha['PRECIO'],
             'precio_unidad' => $id === CANCHA_CUMPLE_ID ? '3 hs' : 'hora',
+            'tiene_precios_horarios' => count(precios_horarios_cancha($con, $id)) > 0,
             'duracion_fija' => $id === CANCHA_CUMPLE_ID ? 3 : null,
         ];
     }
