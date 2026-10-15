@@ -388,6 +388,12 @@ function enviar_confirmacion_wp_bot($ticket_id)
         . "Te esperamos!\n"
         . "Tambien se envio una copia al correo registrado.";
 
+    // Delivered only from the approved-payment confirmation, for both bot modes.
+    $terminos = terminos_reserva((int) ($datos['cancha_id'] ?? 0));
+    if ($terminos) {
+        $message .= "\n\nTerminos y condiciones de tu reserva:\n- " . implode("\n- ", $terminos);
+    }
+
     [$enviado, $mensaje_error] = wp_bot_enviar_mensaje($telefono, $message);
     if (!$enviado) {
         liberar_confirmacion_wp($ticket_id, $mensaje_error);

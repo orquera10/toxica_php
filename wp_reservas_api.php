@@ -919,7 +919,9 @@ function api_crear_reserva()
     $input = api_input();
     $acepta_terminos = filter_var($input['acepta_terminos'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
-    if (!$acepta_terminos) {
+    $condiciones_despues_pago = filter_var($input['condiciones_despues_pago'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+    if (!$acepta_terminos && !$condiciones_despues_pago) {
         api_responder(400, [
             'success' => false,
             'message' => 'El cliente debe aceptar los terminos y condiciones de la reserva.',
