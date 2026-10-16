@@ -1237,9 +1237,56 @@ function api_cancelar_reserva()
 api_autorizar();
 cancelar_reservas_pendientes_vencidas($con);
 
+function api_desvincular_cliente()
+{
+    global $con;
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') api_responder(405, ['success' => false, 'message' => 'Usa POST para desvincular.']);
+    $input = api_input();
+    $telefono = preg_replace('/[^0-9]/', '', (string) ($input['telefono'] ?? ''));
+    if (strlen($telefono) < 10 || strlen($telefono) > 15 || ($input['confirmar'] ?? false) !== true) {
+        api_responder(400, ['success' => false, 'message' => 'Indica un telefono valido y confirma la desvinculacion.']);
+    }
+    $cliente = api_buscar_cliente($telefono);
+    if (!$cliente) api_responder(200, ['success' => true, 'desvinculado' => false]);
+    $id = (int) $cliente['_id'];
+    $con->begin_transaction();
+    try {
+        $stmt = $con->prepare('SELECT TELEFONO FROM clientes WHERE _id = ? FOR UPDATE');
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+        $actual = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if (!$actual || $actual['TELEFONO'] !== $cliente['TELEFONO']) {
+            $con->rollback();
+            api_responder(409, ['success' => false, 'message' => 'La relacion cambio. Volve a intentarlo.']);
+        }
+        $stmt = $con->prepare("SELECT _id FROM ticket WHERE id_CLIENTE = ? AND ESTADO_RESERVA = 'pendiente_pago' AND (PENDIENTE_EXPIRA IS NULL OR PENDIENTE_EXPIRA > NOW()) LIMIT 1");
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+        $pendiente = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if ($pendiente) {
+            $con->rollback();
+            api_responder(409, ['success' => false, 'message' => 'Hay un pago pendiente. Espera a que se confirme o venza antes de desvincular.']);
+        }
+        $stmt = $con->prepare("UPDATE clientes SET TELEFONO = '' WHERE _id = ?");
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+        $stmt->close();
+        $con->commit();
+    } catch (Throwable $error) {
+        $con->rollback();
+        api_responder(500, ['success' => false, 'message' => 'No se pudo desvincular al cliente.']);
+    }
+    api_responder(200, ['success' => true, 'desvinculado' => true]);
+}
+
 $action = $_GET['action'] ?? $_GET['endpoint'] ?? '';
 
 switch ($action) {
+    case 'desvincular_cliente':
+        api_desvincular_cliente();
+        break;
     case 'canchas':
         api_listar_canchas();
         break;
