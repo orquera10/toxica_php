@@ -10,6 +10,7 @@ $updated = false;
 $committed = false;
 $rolledBack = false;
 function api_input() { global $scenario; return ['telefono' => '5493881234567', 'confirmar' => $scenario !== 'invalid']; }
+function bot_identity_context() { return null; }
 function api_buscar_cliente($phone) { global $scenario; return $scenario === 'notfound' ? null : ['_id' => 42, 'TELEFONO' => '3881234567']; }
 function api_responder($status, $data) {
     global $scenario, $updated, $committed, $rolledBack;

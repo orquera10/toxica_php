@@ -2,6 +2,7 @@
 require_once 'config.php';
 require_once 'cliente_mailer.php';
 require_once 'reglas_reservas.php';
+require_once __DIR__ . '/wp_bot_identity.php';
 require_once 'vendor/autoload.php';
 
 function app_public_url()
@@ -192,7 +193,7 @@ function enviar_mail_confirmacion_reserva($datos)
     return enviar_mail_smtp($email, $nombre, 'Reserva confirmada - La Toxica', $html);
 }
 
-function wp_bot_enviar_mensaje($telefono, $mensaje)
+function wp_bot_enviar_mensaje($telefono, $mensaje, $session_id = '')
 {
     global $api_key, $wp_bot_send_endpoint;
 
@@ -200,6 +201,7 @@ function wp_bot_enviar_mensaje($telefono, $mensaje)
         'to' => $telefono,
         'message' => $mensaje,
     ];
+    if ($session_id !== '') $payload['botSession'] = $session_id;
 
     $ch = curl_init($wp_bot_send_endpoint);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -226,7 +228,7 @@ function wp_bot_enviar_mensaje($telefono, $mensaje)
     return [true, 'Mensaje enviado.'];
 }
 
-function wp_bot_iniciar_invitacion_cumpleanios($telefono, $datos)
+function wp_bot_iniciar_invitacion_cumpleanios($telefono, $datos, $session_id = '')
 {
     global $api_key, $wp_bot_birthday_endpoint;
 
@@ -236,7 +238,8 @@ function wp_bot_iniciar_invitacion_cumpleanios($telefono, $datos)
 
     $payload = [
         'to' => $telefono,
-        'phone' => $telefono,
+        'phone' => strpos($telefono, '@lid') !== false ? '' : $telefono,
+        'botSession' => $session_id,
         'date' => (string) ($datos['FECHA'] ?? ''),
         'startTime' => (string) ($datos['HORA_INICIO'] ?? ''),
         'endTime' => (string) ($datos['HORA_FIN'] ?? ''),
@@ -366,14 +369,19 @@ function enviar_confirmacion_wp_bot($ticket_id)
         error_log("Error alertas WP ticket {$ticket_id}: " . $mensaje_alertas);
     }
 
-    $telefono = wp_bot_normalizar_telefono($datos['TELEFONO'] ?? '');
+    $chat = bot_booking_chat($ticket_id);
+    $telefono = $chat['jid'] ?? wp_bot_normalizar_telefono($datos['TELEFONO'] ?? '');
     if ($telefono === '') {
         liberar_confirmacion_wp($ticket_id, 'Telefono de cliente invalido.');
         return [false, 'Telefono de cliente invalido.'];
     }
 
-    [$mail_ok, $mail_mensaje] = enviar_mail_confirmacion_reserva($datos);
-    if (!$mail_ok) {
+    $mail_ok = false;
+    $mail_mensaje = '';
+    if (filter_var($datos['MAIL'] ?? '', FILTER_VALIDATE_EMAIL)) {
+        [$mail_ok, $mail_mensaje] = enviar_mail_confirmacion_reserva($datos);
+    }
+    if (!$mail_ok && $mail_mensaje !== '') {
         registrar_error_confirmacion_wp($ticket_id, 'No se pudo enviar el correo de confirmacion: ' . $mail_mensaje);
     }
 
@@ -385,8 +393,8 @@ function enviar_confirmacion_wp_bot($ticket_id)
         . "Horario: " . $datos['HORA_INICIO'] . " a " . $datos['HORA_FIN'] . "\n"
         . "Senia Mercado Pago: $" . number_format($monto_mp, 0, ',', '.') . "\n"
         . "Saldo pendiente: $" . number_format($saldo, 0, ',', '.') . "\n"
-        . "Te esperamos!\n"
-        . "Tambien se envio una copia al correo registrado.";
+        . "Te esperamos!";
+    if ($mail_ok) $message .= "\nTambien se envio una copia al correo registrado.";
 
     // Delivered only from the approved-payment confirmation, for both bot modes.
     $terminos = terminos_reserva((int) ($datos['cancha_id'] ?? 0));
@@ -394,14 +402,14 @@ function enviar_confirmacion_wp_bot($ticket_id)
         $message .= "\n\nTerminos y condiciones de tu reserva:\n- " . implode("\n- ", $terminos);
     }
 
-    [$enviado, $mensaje_error] = wp_bot_enviar_mensaje($telefono, $message);
+    [$enviado, $mensaje_error] = wp_bot_enviar_mensaje($telefono, $message, $chat['session_id'] ?? '');
     if (!$enviado) {
         liberar_confirmacion_wp($ticket_id, $mensaje_error);
         return [false, $mensaje_error];
     }
 
     if ((int) ($datos['cancha_id'] ?? 0) === (int) CANCHA_CUMPLE_ID) {
-        [$invitacion_ok, $invitacion_mensaje] = wp_bot_iniciar_invitacion_cumpleanios($telefono, $datos);
+        [$invitacion_ok, $invitacion_mensaje] = wp_bot_iniciar_invitacion_cumpleanios($telefono, $datos, $chat['session_id'] ?? '');
         if (!$invitacion_ok) {
             registrar_error_confirmacion_wp($ticket_id, $invitacion_mensaje);
             error_log("Error invitacion WP ticket {$ticket_id}: " . $invitacion_mensaje);
@@ -447,6 +455,8 @@ function crear_preferencia_senia($ticket_id, $cliente, $descripcion, $monto_seni
         'expiration_date_from' => date('c'),
         'expiration_date_to' => date('c', $expira_ts),
     ];
+
+    if (!filter_var($cliente['MAIL'] ?? '', FILTER_VALIDATE_EMAIL)) unset($payload['payer']['email']);
 
     $tipos_disponibles = [
         'account_money',

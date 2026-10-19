@@ -18,7 +18,11 @@ function nombre_cancha_cliente($id, $name) { return $name; }
 function enviar_alertas_reserva_confirmada_hoy($data) { return []; }
 function wp_bot_normalizar_telefono($phone) { return $phone; }
 function enviar_mail_confirmacion_reserva($data) { return [true, '']; }
-function wp_bot_enviar_mensaje($phone, $message) { global $messages; $messages[] = $message; return [true, '']; }
+function bot_booking_chat($ticket) { return ['jid' => '123456789012345@lid', 'session_id' => 'la-toxica']; }
+function wp_bot_enviar_mensaje($phone, $message, $session = '') {
+    if ($phone !== '123456789012345@lid' || $session !== 'la-toxica') throw new RuntimeException('Wrong confirmation chat or session');
+    global $messages; $messages[] = $message; return [true, ''];
+}
 function wp_bot_iniciar_invitacion_cumpleanios($phone, $data) { return [true, '']; }
 class ConfirmationFakeConnection {
     function prepare($sql) { return $this; }
@@ -37,6 +41,7 @@ foreach ([1, CANCHA_CUMPLE_ID] as $court) {
     enviar_confirmacion_wp_bot(123);
     if (count($messages) !== 1) throw new RuntimeException('Missing confirmation');
     $message = $messages[0];
+    if (strpos($message, 'copia al correo') !== false) throw new RuntimeException('Must not promise email when none is registered');
     if (strpos($message, 'quedo confirmada') > strpos($message, 'Terminos y condiciones')) throw new RuntimeException('Terms must follow confirmation');
     foreach (terminos_reserva($court) as $term) {
         if (strpos($message, $term) === false) throw new RuntimeException('Missing court condition');

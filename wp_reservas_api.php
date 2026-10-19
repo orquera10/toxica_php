@@ -4,6 +4,7 @@ require_once __DIR__ . '/reglas_reservas.php';
 require_once __DIR__ . '/bloqueos_horarios.php';
 require_once __DIR__ . '/mercadopago_utils.php';
 require_once __DIR__ . '/cliente_mailer.php';
+require_once __DIR__ . '/wp_bot_identity.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -513,6 +514,12 @@ function api_obtener_o_crear_cliente($datos)
 {
     global $con;
 
+    $ctx = bot_identity_context();
+    if ($ctx) {
+        $linked = bot_identity_customer($ctx);
+        return $linked ? [true, '', $linked] : [false, 'Primero completa el registro de este chat con tu nombre completo.', null];
+    }
+
     $nombre = trim((string) ($datos['nombre'] ?? ''));
     $email = strtolower(trim((string) ($datos['email'] ?? '')));
     $telefono = trim((string) ($datos['telefono'] ?? ''));
@@ -777,9 +784,10 @@ function api_consultar_cliente()
     $telefono = $_GET['telefono'] ?? '';
     $email = $_GET['email'] ?? '';
     $nombre = trim((string) ($_GET['nombre'] ?? ''));
-    $cliente = api_buscar_cliente($telefono, $email);
+    $ctx = bot_identity_context();
+    $cliente = $ctx ? bot_identity_customer($ctx) : api_buscar_cliente($telefono, $email);
 
-    if (!$cliente && $nombre !== '') {
+    if (!$ctx && !$cliente && $nombre !== '') {
         $stmt = $con->prepare("SELECT _id, NOMBRE, MAIL, TELEFONO FROM clientes WHERE VISIBLE = 1 AND LOWER(TRIM(NOMBRE)) = LOWER(TRIM(?)) LIMIT 2");
         $stmt->bind_param("s", $nombre);
         $stmt->execute();
@@ -830,7 +838,8 @@ function api_consultar_turnos()
 
     $telefono = $_GET['telefono'] ?? '';
     $email = $_GET['email'] ?? '';
-    $cliente = api_buscar_cliente($telefono, $email);
+    $ctx = bot_identity_context();
+    $cliente = $ctx ? bot_identity_customer($ctx) : api_buscar_cliente($telefono, $email);
 
     if (!$cliente) {
         api_responder(404, [
@@ -1073,6 +1082,7 @@ function api_crear_reserva()
         ]);
     }
 
+    bot_booking_chat_save($id_ticket);
     $nombre_cancha = nombre_cancha_cliente($id_cancha, $cancha['NOMBRE']);
     $descripcion = "Senia reserva " . $nombre_cancha . " " . $fecha . " " . $hora_inicio . " a " . $hora_fin;
     [$mp_ok, $mp_mensaje, $preferencia] = crear_preferencia_senia($id_ticket, $cliente, $descripcion, $monto_senia, $pendiente_expira);
@@ -1242,11 +1252,12 @@ function api_desvincular_cliente()
     global $con;
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') api_responder(405, ['success' => false, 'message' => 'Usa POST para desvincular.']);
     $input = api_input();
+    $ctx = bot_identity_context();
     $telefono = preg_replace('/[^0-9]/', '', (string) ($input['telefono'] ?? ''));
-    if (strlen($telefono) < 10 || strlen($telefono) > 15 || ($input['confirmar'] ?? false) !== true) {
+    if ((!$ctx && (strlen($telefono) < 10 || strlen($telefono) > 15)) || ($input['confirmar'] ?? false) !== true) {
         api_responder(400, ['success' => false, 'message' => 'Indica un telefono valido y confirma la desvinculacion.']);
     }
-    $cliente = api_buscar_cliente($telefono);
+    $cliente = $ctx ? bot_identity_customer($ctx) : api_buscar_cliente($telefono);
     if (!$cliente) api_responder(200, ['success' => true, 'desvinculado' => false]);
     $id = (int) $cliente['_id'];
     $con->begin_transaction();
@@ -1269,10 +1280,16 @@ function api_desvincular_cliente()
             $con->rollback();
             api_responder(409, ['success' => false, 'message' => 'Hay un pago pendiente. Espera a que se confirme o venza antes de desvincular.']);
         }
-        $stmt = $con->prepare("UPDATE clientes SET TELEFONO = '' WHERE _id = ?");
-        $stmt->bind_param('i', $id);
-        $stmt->execute();
-        $stmt->close();
+        if (!$ctx || substr($ctx['jid'], -15) === '@s.whatsapp.net') {
+            $stmt = $con->prepare("UPDATE clientes SET TELEFONO = '' WHERE _id = ?");
+            $stmt->bind_param('i', $id); $stmt->execute(); $stmt->close();
+        }
+        if ($ctx) {
+            $stmt = $con->prepare('DELETE FROM wp_bot_identities WHERE scope_hash = ? AND cliente_id = ?');
+            $stmt->bind_param('si', $ctx['scope'], $id); $stmt->execute(); $stmt->close();
+            $stmt = $con->prepare('DELETE FROM wp_bot_challenges WHERE scope_hash = ? AND jid = ?');
+            $stmt->bind_param('ss', $ctx['scope'], $ctx['jid']); $stmt->execute(); $stmt->close();
+        }
         $con->commit();
     } catch (Throwable $error) {
         $con->rollback();
@@ -1284,6 +1301,9 @@ function api_desvincular_cliente()
 $action = $_GET['action'] ?? $_GET['endpoint'] ?? '';
 
 switch ($action) {
+    case 'registrar_chat':
+        bot_register_identity();
+        break;
     case 'desvincular_cliente':
         api_desvincular_cliente();
         break;
@@ -1334,6 +1354,7 @@ switch ($action) {
                 'POST action=registrar',
                 'POST action=verificar_registro',
                 'POST action=crear_cliente',
+                'POST action=registrar_chat (bot_jid, bot_session, nombre; codigo si necesita verificar)',
                 'POST action=reservar',
                 'POST action=cancelar',
             ],
