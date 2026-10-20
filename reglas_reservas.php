@@ -192,6 +192,7 @@ function terminos_reserva_cumpleanios()
     $dias_anticipacion = max_dias_anticipacion_reserva(CANCHA_CUMPLE_ID);
 
     return [
+        'El turno de cumpleaños incluye el uso de la parrilla.',
         'El horario de cumpleaños incluye el uso de cancha por 3 horas con el salón inferior, para hasta 30 personas entre adultos y niños. La persona adicional tiene costo adicional (consultar).',
         "Las reservas de cumpleaños pueden realizarse con un máximo de {$dias_anticipacion} días de anticipación.",
         'La seña es totalmente reembolsable, únicamente hasta 72 horas previas al evento.',
@@ -211,6 +212,7 @@ function terminos_reserva_turnos()
     $dias_anticipacion = max_dias_anticipacion_reserva(CANCHA_1_ID);
 
     return [
+        'Para turnos comunes nocturnos, el uso de parrilla requiere un consumo mínimo actual de $50.000. Para turnos comunes diurnos, consultar las condiciones. Este mínimo no corresponde a los turnos de cumpleaños, que incluyen parrilla.',
         'La seña es no reembolsable y tampoco modificable.',
         "Las reservas de turnos pueden realizarse con un máximo de {$dias_anticipacion} días de anticipación.",
         'La tolerancia es de 10 minutos.',
