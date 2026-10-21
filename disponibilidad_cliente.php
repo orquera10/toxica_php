@@ -9,7 +9,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 $fecha_input = $_GET['fecha'] ?? '';
 $id_cancha = (int) ($_GET['cancha'] ?? 0);
-$duracion = duracion_reserva($id_cancha, (int) ($_GET['duracion'] ?? 1));
+$duracion = duracion_reserva($id_cancha, (float) ($_GET['duracion'] ?? 1));
 
 if (!$fecha_input || $id_cancha <= 0 || $duracion < 1 || $duracion > 4) {
     echo json_encode([
@@ -100,8 +100,8 @@ AND " . condicion_solapamiento_canchas_sql();
 foreach ($inicios_minutos as $inicio_minutos) {
     $inicio_ts = strtotime($fecha_input . ' 00:00') + ($inicio_minutos * 60);
     $hora_inicio = date('H:i', $inicio_ts);
-    $fin_minutos = $inicio_minutos + ($duracion * 60);
-    $fin_ts = strtotime('+' . $duracion . ' hours', $inicio_ts);
+    $fin_minutos = $inicio_minutos + (int) round($duracion * 60);
+    $fin_ts = strtotime('+' . (int) round($duracion * 60) . ' minutes', $inicio_ts);
     $hora_fin = date('H:i', $fin_ts);
 
     if (!reserva_en_horario_habil_cancha($con, $id_cancha, $fecha_input, $hora_inicio, $duracion)) {

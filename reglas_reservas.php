@@ -116,7 +116,12 @@ function duracion_reserva($id_cancha, $duracion)
         return 3;
     }
 
-    return (int) $duracion;
+    $dur = (float) $duracion;
+    if ($dur < 1) {
+        return 1;
+    }
+
+    return round($dur * 2) / 2;
 }
 
 function max_dias_anticipacion_reserva($id_cancha)
@@ -297,14 +302,71 @@ function horario_en_hora_punto($hora)
     return (int) $partes[1] === 0;
 }
 
+function horario_turno_valido($hora_inicio, $duracion)
+{
+    $partes = explode(':', (string) $hora_inicio);
+    if (count($partes) < 2) {
+        return [false, 'Formato de hora inválido.'];
+    }
+
+    $minutos = (int) $partes[1];
+    if ($minutos !== 0 && $minutos !== 30) {
+        return [false, 'Los turnos deben comenzar en horas en punto o cada 30 minutos.'];
+    }
+
+    $dur = (float) $duracion;
+    if ($dur < 1 || $dur > 4 || round($dur * 2) != ($dur * 2)) {
+        return [false, 'La duración debe ser de entre 1 y 4 horas (en múltiplos de 30 minutos).'];
+    }
+
+    $inicio_minutos = minutos_desde_apertura($hora_inicio);
+    if ($inicio_minutos === null) {
+        return [false, 'Horario de inicio inválido.'];
+    }
+
+    $duracion_minutos = (int) round($dur * 60);
+    $fin_minutos = $inicio_minutos + $duracion_minutos;
+
+    // Límite nocturno: 20:00 (1200 minutos desde las 00:00)
+    $nocturno_minutos = 20 * 60;
+
+    // Si el turno finaliza después de las 20:00 (horario nocturno)
+    if ($fin_minutos > $nocturno_minutos) {
+        // En horario nocturno solo se permiten horas fijas en punto
+        if ($inicio_minutos % 60 !== 0 || $fin_minutos % 60 !== 0 || round($dur) != $dur) {
+            return [
+                false,
+                'A partir de las 20:00 (horario nocturno) los turnos deben ser únicamente en horas fijas en punto (ej. 20 a 21, 20 a 22, 23 a 01).'
+            ];
+        }
+    }
+
+    return [true, ''];
+}
+
 function inicios_en_horas_punto($franjas, $duracion)
 {
     $inicios = [];
-    $duracion_minutos = (int) $duracion * 60;
+    $duracion_minutos = (int) round(((float) $duracion) * 60);
+    $nocturno_minutos = 20 * 60;
 
     foreach ($franjas as $franja) {
-        $primer_inicio = (int) (ceil($franja['apertura'] / 60) * 60);
-        for ($inicio = $primer_inicio; $inicio + $duracion_minutos <= $franja['cierre']; $inicio += 60) {
+        $primer_inicio = (int) (ceil($franja['apertura'] / 30) * 30);
+        for ($inicio = $primer_inicio; $inicio + $duracion_minutos <= $franja['cierre']; $inicio += 30) {
+            $fin = $inicio + $duracion_minutos;
+
+            if ($fin > $nocturno_minutos) {
+                // A partir de las 20:00 (horario nocturno), solo horas fijas en punto
+                if ($inicio % 60 !== 0 || $fin % 60 !== 0) {
+                    continue;
+                }
+            } else {
+                // Hasta las 20:00, se permiten fraccionados cada 30 minutos
+                if ($inicio % 30 !== 0 || $fin % 30 !== 0) {
+                    continue;
+                }
+            }
+
             $inicios[] = $inicio;
         }
     }
@@ -337,7 +399,7 @@ function reserva_dentro_del_horario($hora_inicio, $duracion)
         return false;
     }
 
-    return $inicio_minutos >= APERTURA_MINUTOS && ($inicio_minutos + ((int) $duracion * 60)) <= CIERRE_MINUTOS;
+    return $inicio_minutos >= APERTURA_MINUTOS && ($inicio_minutos + ((int) round(((float) $duracion) * 60))) <= CIERRE_MINUTOS;
 }
 
 function reserva_cumpleanios_dentro_del_horario($hora_inicio, $duracion)
@@ -352,7 +414,7 @@ function reserva_cumpleanios_dentro_del_horario($hora_inicio, $duracion)
         $inicio_minutos += 24 * 60;
     }
 
-    return $inicio_minutos >= APERTURA_CUMPLE_MINUTOS && ($inicio_minutos + ((int) $duracion * 60)) <= CIERRE_MINUTOS;
+    return $inicio_minutos >= APERTURA_CUMPLE_MINUTOS && ($inicio_minutos + ((int) round(((float) $duracion) * 60))) <= CIERRE_MINUTOS;
 }
 
 function reserva_dentro_del_horario_cancha($id_cancha, $hora_inicio, $duracion, $fecha = '')
@@ -374,7 +436,7 @@ function reserva_dentro_del_horario_cancha($id_cancha, $hora_inicio, $duracion, 
     }
 
     if ((int) $id_cancha === CANCHA_PROMO_ID) {
-        return $inicio_minutos >= APERTURA_MINUTOS && ($inicio_minutos + ((int) $duracion * 60)) <= CIERRE_PROMO_MINUTOS;
+        return $inicio_minutos >= APERTURA_MINUTOS && ($inicio_minutos + ((int) round(((float) $duracion) * 60))) <= CIERRE_PROMO_MINUTOS;
     }
 
     return reserva_dentro_del_horario($hora_inicio, $duracion);

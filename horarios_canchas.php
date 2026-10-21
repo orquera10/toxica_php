@@ -351,7 +351,7 @@ function reserva_en_horario_habil_cancha($con, $id, $fecha, $hora, $duracion)
         if (
             $inicio !== null
             && $inicio >= $franja['apertura']
-            && $inicio + (int) $duracion * 60 <= $franja['cierre']
+            && $inicio + (int) round(((float) $duracion) * 60) <= $franja['cierre']
         ) {
             return true;
         }

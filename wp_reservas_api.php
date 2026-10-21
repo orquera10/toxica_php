@@ -677,7 +677,7 @@ function api_slots_disponibles($fecha_input, $id_cancha, $duracion)
 
     foreach ($inicios_minutos as $inicio_minutos) {
         $inicio_ts = strtotime(date('Y-m-d', $fecha_ts) . ' 00:00') + ($inicio_minutos * 60);
-        $fin_ts = strtotime('+' . $duracion . ' hours', $inicio_ts);
+        $fin_ts = strtotime('+' . (int) round($duracion * 60) . ' minutes', $inicio_ts);
 
         if ($inicio_ts === false || $fin_ts === false || $inicio_ts <= $ahora) {
             continue;
@@ -759,7 +759,7 @@ function api_disponibilidad()
 {
     $fecha = $_GET['fecha'] ?? '';
     $id_cancha = (int) ($_GET['cancha'] ?? 0);
-    $duracion = duracion_reserva($id_cancha, (int) ($_GET['duracion'] ?? 1));
+    $duracion = duracion_reserva($id_cancha, (float) ($_GET['duracion'] ?? 1));
 
     if ($fecha === '' || $id_cancha <= 0 || $duracion < 1 || $duracion > 4) {
         api_responder(400, [
@@ -950,7 +950,7 @@ function api_crear_reserva()
     $fecha_input = (string) ($input['fecha'] ?? $input['fecha_reserva'] ?? '');
     $hora_inicio = (string) ($input['hora_inicio'] ?? '');
     $id_cancha = (int) ($input['cancha'] ?? $input['cancha_id'] ?? 0);
-    $duracion = duracion_reserva($id_cancha, (int) ($input['duracion'] ?? 1));
+    $duracion = duracion_reserva($id_cancha, (float) ($input['duracion'] ?? 1));
 
     if ($fecha_input === '' || $hora_inicio === '' || $id_cancha <= 0 || $duracion < 1 || $duracion > 4) {
         api_responder(400, [
@@ -966,10 +966,11 @@ function api_crear_reserva()
         ]);
     }
 
-    if (!horario_en_hora_punto($hora_inicio)) {
+    [$horario_valido, $mensaje_horario_regla] = horario_turno_valido($hora_inicio, $duracion);
+    if (!$horario_valido) {
         api_responder(400, [
             'success' => false,
-            'message' => 'Los turnos deben comenzar en horas en punto.',
+            'message' => $mensaje_horario_regla,
         ]);
     }
 
@@ -1002,7 +1003,7 @@ function api_crear_reserva()
         ]);
     }
 
-    $fin_ts = strtotime('+' . $duracion . ' hours', $inicio_ts);
+    $fin_ts = strtotime('+' . (int) round($duracion * 60) . ' minutes', $inicio_ts);
     $fecha = date('d-m-Y', $inicio_ts);
     $fecha_reserva = date('Y-m-d', $inicio_ts);
     $hora_inicio = date('H:i', $inicio_ts);

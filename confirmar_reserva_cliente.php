@@ -29,7 +29,7 @@ if ($fecha_input === '') {
 
 $hora_inicio_input = $_POST['hora_inicio'] ?? '';
 $id_cancha = (int) ($_POST['cancha'] ?? 0);
-$duracion = duracion_reserva($id_cancha, (int) ($_POST['duracion'] ?? 1));
+$duracion = duracion_reserva($id_cancha, (float) ($_POST['duracion'] ?? 1));
 
 if (!$fecha_input || !$hora_inicio_input || $duracion < 1 || $duracion > 4 || $id_cancha <= 0) {
     volver_reservas_cliente("Completa todos los datos de la reserva.");
@@ -39,8 +39,9 @@ if (!reserva_dentro_del_plazo($fecha_input, $id_cancha, $hora_inicio_input)) {
     volver_reservas_cliente(mensaje_plazo_reserva($id_cancha));
 }
 
-if (!horario_en_hora_punto($hora_inicio_input)) {
-    volver_reservas_cliente("Los turnos deben comenzar en horas en punto.");
+[$horario_valido, $mensaje_horario_regla] = horario_turno_valido($hora_inicio_input, $duracion);
+if (!$horario_valido) {
+    volver_reservas_cliente($mensaje_horario_regla);
 }
 
 $reserva_horario_valida = $id_cancha === CANCHA_CUMPLE_ID
@@ -61,7 +62,7 @@ if ($inicio_ts === false || $inicio_ts < time()) {
     volver_reservas_cliente("Elige una fecha y horario futuro.");
 }
 
-$fin_ts = strtotime('+' . $duracion . ' hours', $inicio_ts);
+$fin_ts = strtotime('+' . (int) round($duracion * 60) . ' minutes', $inicio_ts);
 $fecha = date('d-m-Y', $inicio_ts);
 $fecha_reserva = date('Y-m-d', $inicio_ts);
 $hora_inicio = date('H:i', $inicio_ts);
