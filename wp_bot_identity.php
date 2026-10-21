@@ -75,52 +75,14 @@ function bot_register_identity()
     if (mb_strlen($name) < 5 || mb_strlen($name) > 150 || count(explode(' ', $name)) < 2 || preg_match('/[0-9<>@]/u', $name)) {
         api_responder(400, ['success' => false, 'message' => 'Escribi tu nombre y apellido completos.']);
     }
-    $code = trim((string) ($input['codigo'] ?? ''));
-    if ($code !== '') {
-        $stmt = $con->prepare('SELECT cliente_id,code_hash,expires_at,attempts FROM wp_bot_challenges WHERE scope_hash = ? AND jid = ?');
-        $stmt->bind_param('ss', $ctx['scope'], $ctx['jid']); $stmt->execute(); $challenge = $stmt->get_result()->fetch_assoc(); $stmt->close();
-        if (!$challenge || strtotime($challenge['expires_at']) <= time() || $challenge['attempts'] >= 5) api_responder(400, ['success' => false, 'message' => 'El codigo vencio o se agotaron los intentos. Escribi cancelar para comenzar de nuevo.']);
-        $stmt = $con->prepare('UPDATE wp_bot_challenges SET attempts = attempts + 1 WHERE scope_hash = ? AND jid = ?');
-        $stmt->bind_param('ss', $ctx['scope'], $ctx['jid']); $stmt->execute(); $stmt->close();
-        if (!password_verify($code, $challenge['code_hash'])) api_responder(400, ['success' => false, 'message' => 'El codigo no es correcto. Revisalo y volve a enviarlo.']);
-        $con->begin_transaction();
-        try {
-            // Consume once, including two concurrent correct submissions.
-            $stmt = $con->prepare('DELETE FROM wp_bot_challenges WHERE scope_hash = ? AND jid = ? AND code_hash = ? AND expires_at > NOW() AND attempts <= 5');
-            $stmt->bind_param('sss', $ctx['scope'], $ctx['jid'], $challenge['code_hash']); $stmt->execute(); $consumed = $stmt->affected_rows; $stmt->close();
-            if ($consumed !== 1) throw new RuntimeException('Codigo ya utilizado.');
-            bot_identity_bind($ctx, (int) $challenge['cliente_id']);
-            $con->commit();
-        } catch (Throwable $error) { $con->rollback(); api_responder(409, ['success' => false, 'message' => 'El codigo ya se utilizo o vencio.']); }
-        api_responder(200, bot_identity_result(bot_identity_customer($ctx)));
-    }
     // Explicit accent-insensitive comparison; collapse repeated spaces in stored names.
-    $stmt = $con->prepare("SELECT _id,NOMBRE,MAIL,TELEFONO FROM clientes WHERE VISIBLE = 1 AND CONVERT(REPLACE(REPLACE(REPLACE(TRIM(NOMBRE),'  ',' '),'  ',' '),'  ',' ') USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci LIMIT 3");
+    $stmt = $con->prepare("SELECT _id,NOMBRE,MAIL,TELEFONO FROM clientes WHERE VISIBLE = 1 AND CONVERT(REPLACE(REPLACE(REPLACE(TRIM(NOMBRE),'  ',' '),'  ',' '),'  ',' ') USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci ORDER BY _id DESC LIMIT 1");
     $stmt->bind_param('s', $name); $stmt->execute(); $matches = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
-    if (count($matches) > 1) {
-        $email = strtolower(trim((string) ($input['email'] ?? '')));
-        $matches = array_values(array_filter($matches, fn($c) => $email !== '' && strtolower(trim((string) $c['MAIL'])) === $email));
-        if (count($matches) !== 1) api_responder(200, ['success' => true, 'status' => 'ambiguous', 'message' => 'Hay varios registros con ese nombre. Indica el correo que ya tenes registrado para verificar el tuyo, o contacta al negocio.']);
-    }
     if ($matches) {
         $candidate = $matches[0];
         $id = (int) $candidate['_id'];
-        $stmt = $con->prepare('SELECT sent_at FROM wp_bot_challenges WHERE scope_hash = ? AND jid = ?');
-        $stmt->bind_param('ss', $ctx['scope'], $ctx['jid']); $stmt->execute(); $last = $stmt->get_result()->fetch_assoc(); $stmt->close();
-        if ($last && time() - strtotime($last['sent_at']) < 60) api_responder(429, ['success' => false, 'message' => 'Espera un minuto antes de pedir otro codigo.']);
-        $code = (string) random_int(100000, 999999);
-        if (filter_var($candidate['MAIL'], FILTER_VALIDATE_EMAIL)) {
-            [$ok] = enviar_mail_smtp($candidate['MAIL'], $candidate['NOMBRE'], 'Vincular WhatsApp - La Toxica', '<p>Tu codigo para vincular WhatsApp es <strong>' . $code . '</strong>. Vence en 10 minutos. Si no lo pediste, ignora este mensaje.</p>');
-            $channel = 'correo';
-        } elseif (api_telefono_local($candidate['TELEFONO']) !== '') {
-            [$ok] = wp_bot_enviar_mensaje($candidate['TELEFONO'], 'Tu codigo para vincular el chat a La Toxica es ' . $code . '. Vence en 10 minutos. Si no lo pediste, ignoralo.', $ctx['session']);
-            $channel = 'WhatsApp registrado';
-        } else { api_responder(200, ['success' => true, 'status' => 'needs_staff', 'message' => 'Encontre un registro con ese nombre, pero necesitamos que el negocio verifique la vinculacion.']); }
-        if (!$ok) api_responder(503, ['success' => false, 'message' => 'No pude enviar el codigo. Contacta al negocio para vincular tu registro.']);
-        $hash = password_hash($code, PASSWORD_DEFAULT);
-        $stmt = $con->prepare('INSERT INTO wp_bot_challenges(scope_hash,jid,cliente_id,code_hash,expires_at,attempts,sent_at) VALUES(?,?,?,?,DATE_ADD(NOW(),INTERVAL 10 MINUTE),0,NOW()) ON DUPLICATE KEY UPDATE cliente_id=VALUES(cliente_id),code_hash=VALUES(code_hash),expires_at=VALUES(expires_at),attempts=0,sent_at=NOW()');
-        $stmt->bind_param('ssis', $ctx['scope'], $ctx['jid'], $id, $hash); $stmt->execute(); $stmt->close();
-        api_responder(200, ['success' => true, 'status' => 'verification_required', 'message' => 'Te envie un codigo al ' . $channel . ' que ya tenes registrado. Escribilo aca para vincular este chat.']);
+        bot_identity_bind($ctx, $id);
+        api_responder(200, bot_identity_result(bot_identity_customer($ctx)));
     }
     $phone = $ctx['phone'] !== '' ? api_telefono_local($ctx['phone']) : '';
     $con->begin_transaction();

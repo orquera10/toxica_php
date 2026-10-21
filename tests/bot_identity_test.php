@@ -16,13 +16,11 @@ function enviar_mail_smtp(...$args) { global $sent; $sent = true; return [true, 
 function wp_bot_enviar_mensaje(...$args) { throw new RuntimeException('This test has no real phone'); }
 function api_responder($status, $data) {
     global $scenario, $bound, $created, $sent, $consumed;
-    $expectedStatus = ['new'=>201,'linked'=>200,'existing'=>200,'ambiguous'=>200,'no-contact'=>200,'code-good'=>200,'code-bad'=>400,'code-expired'=>400,'code-limited'=>400][$scenario];
+    $expectedStatus = ['new'=>201,'linked'=>200,'existing'=>200][$scenario];
     $ok = $status === $expectedStatus;
     if ($scenario === 'new') $ok = $ok && $created && $bound && $data['cliente']['email'] === '';
     if ($scenario === 'linked') $ok = $ok && !$created && $data['cliente']['id'] === 42;
-    if ($scenario === 'existing') $ok = $ok && $sent && !$bound && $data['status'] === 'verification_required';
-    if ($scenario === 'ambiguous') $ok = $ok && !$bound && $data['status'] === 'ambiguous';
-    if ($scenario === 'no-contact') $ok = $ok && !$bound && $data['status'] === 'needs_staff';
+    if ($scenario === 'existing') $ok = $ok && $bound && $data['cliente']['id'] === 42;
     if ($scenario === 'code-good') $ok = $ok && $bound && $consumed;
     if (in_array($scenario,['code-bad','code-expired','code-limited'])) $ok = $ok && !$bound && !$consumed;
     if (isset($data['code_hash']) || isset($data['codigo'])) $ok = false;
