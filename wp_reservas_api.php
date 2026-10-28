@@ -733,9 +733,12 @@ function api_listar_canchas()
         ];
     }
 
+    $configuracion = configuracion_plazos_reserva();
+
     api_responder(200, [
         'success' => true,
         'canchas' => $canchas,
+        'consumo_minimo_asador' => (int) ($configuracion['consumo_minimo_asador'] ?? 50000),
     ]);
 }
 
@@ -1299,6 +1302,120 @@ function api_desvincular_cliente()
     api_responder(200, ['success' => true, 'desvinculado' => true]);
 }
 
+function api_notificar_cancelacion()
+{
+    global $con;
+
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        api_responder(405, [
+            'success' => false,
+            'message' => 'Usa POST para notificar cancelacion / no asistencia.',
+        ]);
+    }
+
+    $input = api_input();
+    $telefono = trim((string) ($input['telefono'] ?? ($input['cliente']['telefono'] ?? '')));
+    $email = trim((string) ($input['email'] ?? ($input['cliente']['email'] ?? '')));
+    $motivo = trim((string) ($input['motivo'] ?? ($input['mensaje'] ?? '')));
+    $ticket_id = (int) ($input['ticket_id'] ?? 0);
+
+    $ctx = bot_identity_context();
+    $cliente = $ctx ? bot_identity_customer($ctx) : null;
+    if (!$cliente && ($telefono !== '' || $email !== '')) {
+        $cliente = api_buscar_cliente($telefono, $email);
+    }
+
+    $reserva = null;
+    if ($cliente) {
+        $cliente_id = (int) $cliente['_id'];
+        if ($ticket_id > 0) {
+            $stmt = $con->prepare("SELECT
+                    tk._id AS ticket_id,
+                    tk.ESTADO_RESERVA,
+                    tk.SENIA,
+                    tk.MP_SENIA,
+                    t.FECHA,
+                    t.HORA_INICIO,
+                    t.HORA_FIN,
+                    c._id AS cancha_id,
+                    c.NOMBRE AS cancha
+                FROM ticket tk
+                INNER JOIN turnos t ON t._id = tk.id_TURNO
+                INNER JOIN canchas c ON c._id = t.id_CANCHA
+                WHERE tk._id = ? AND tk.id_CLIENTE = ?
+                LIMIT 1");
+            if ($stmt) {
+                $stmt->bind_param("ii", $ticket_id, $cliente_id);
+                $stmt->execute();
+                $reserva = $stmt->get_result()->fetch_assoc();
+                $stmt->close();
+            }
+        }
+
+        if (!$reserva) {
+            $stmt = $con->prepare("SELECT
+                    tk._id AS ticket_id,
+                    tk.ESTADO_RESERVA,
+                    tk.SENIA,
+                    tk.MP_SENIA,
+                    t.FECHA,
+                    t.HORA_INICIO,
+                    t.HORA_FIN,
+                    c._id AS cancha_id,
+                    c.NOMBRE AS cancha
+                FROM ticket tk
+                INNER JOIN turnos t ON t._id = tk.id_TURNO
+                INNER JOIN canchas c ON c._id = t.id_CANCHA
+                WHERE tk.id_CLIENTE = ?
+                  AND tk.ESTADO_RESERVA IN ('confirmada', 'aprobada', 'pagada', 'pendiente_pago')
+                  AND STR_TO_DATE(CONCAT(t.FECHA, ' ', t.HORA_INICIO), '%d-%m-%Y %H:%i') >= DATE_SUB(NOW(), INTERVAL 3 HOUR)
+                ORDER BY STR_TO_DATE(CONCAT(t.FECHA, ' ', t.HORA_INICIO), '%d-%m-%Y %H:%i') ASC
+                LIMIT 1");
+            if ($stmt) {
+                $stmt->bind_param("i", $cliente_id);
+                $stmt->execute();
+                $reserva = $stmt->get_result()->fetch_assoc();
+                $stmt->close();
+            }
+        }
+    }
+
+    $nombre_cliente = $cliente ? trim($cliente['NOMBRE'] . ' ' . ($cliente['APELLIDO'] ?? '')) : trim((string) ($input['nombre'] ?? ''));
+    $tel_cliente = $cliente['TELEFONO'] ?? $telefono;
+
+    $datos_alerta = [
+        'cliente_nombre' => $nombre_cliente,
+        'telefono' => $tel_cliente,
+        'cancha' => $reserva ? nombre_cancha_cliente($reserva['cancha_id'], $reserva['cancha']) : trim((string) ($input['cancha'] ?? '')),
+        'fecha' => $reserva['FECHA'] ?? trim((string) ($input['fecha'] ?? '')),
+        'horario' => $reserva ? ($reserva['HORA_INICIO'] . ' a ' . $reserva['HORA_FIN']) : trim((string) ($input['horario'] ?? ($input['hora'] ?? ''))),
+        'motivo' => $motivo,
+    ];
+
+    [$enviado, $detalle_envio, $destinos] = enviar_alerta_cancelacion_no_asistencia($datos_alerta);
+
+    api_responder(200, [
+        'success' => true,
+        'message' => 'Aviso de no asistencia procesado correctamente.',
+        'alertas_enviadas' => $enviado,
+        'destinatarios' => $destinos,
+        'detalle' => $detalle_envio,
+        'reserva' => $reserva ? [
+            'ticket_id' => (int) $reserva['ticket_id'],
+            'fecha' => $reserva['FECHA'],
+            'hora_inicio' => $reserva['HORA_INICIO'],
+            'hora_fin' => $reserva['HORA_FIN'],
+            'cancha' => nombre_cancha_cliente($reserva['cancha_id'], $reserva['cancha']),
+            'estado' => $reserva['ESTADO_RESERVA'],
+        ] : null,
+        'terminos' => [
+            'senia_reembolsable' => false,
+            'turnos_reprogramables' => false,
+            'recordatorio' => 'La seña es no reembolsable ni modificable. Los turnos no se reprograman.',
+        ],
+    ]);
+}
+
 $action = $_GET['action'] ?? $_GET['endpoint'] ?? '';
 
 switch ($action) {
@@ -1342,6 +1459,11 @@ switch ($action) {
     case 'cancelar':
         api_cancelar_reserva();
         break;
+    case 'notificar_cancelacion':
+    case 'notificar_no_asistencia':
+    case 'aviso_no_asiste':
+        api_notificar_cancelacion();
+        break;
     default:
         api_responder(404, [
             'success' => false,
@@ -1358,6 +1480,7 @@ switch ($action) {
                 'POST action=registrar_chat (bot_jid, bot_session, nombre; codigo si necesita verificar)',
                 'POST action=reservar',
                 'POST action=cancelar',
+                'POST action=notificar_cancelacion',
             ],
         ]);
 }

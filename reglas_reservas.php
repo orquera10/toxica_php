@@ -20,6 +20,7 @@ function asegurar_configuracion_plazos_reserva($con)
         id TINYINT UNSIGNED NOT NULL,
         dias_anticipacion_turnos SMALLINT UNSIGNED NOT NULL DEFAULT 30,
         dias_anticipacion_cumpleanos SMALLINT UNSIGNED NOT NULL DEFAULT 60,
+        consumo_minimo_asador INT UNSIGNED NOT NULL DEFAULT 50000,
         telefonos_alerta_reserva_hoy TEXT NULL,
         actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id)
@@ -43,9 +44,22 @@ function asegurar_configuracion_plazos_reserva($con)
         }
     }
 
+    $columna_asador = mysqli_query($con, "SHOW COLUMNS FROM configuracion_reservas LIKE 'consumo_minimo_asador'");
+    if (!$columna_asador) {
+        error_log('No se pudo verificar consumo_minimo_asador: ' . mysqli_error($con));
+        return false;
+    }
+
+    if (mysqli_num_rows($columna_asador) === 0) {
+        if (!mysqli_query($con, "ALTER TABLE configuracion_reservas ADD COLUMN consumo_minimo_asador INT UNSIGNED NOT NULL DEFAULT 50000 AFTER dias_anticipacion_cumpleanos")) {
+            error_log('No se pudo agregar consumo_minimo_asador: ' . mysqli_error($con));
+            return false;
+        }
+    }
+
     $sql = "INSERT IGNORE INTO configuracion_reservas
-        (id, dias_anticipacion_turnos, dias_anticipacion_cumpleanos)
-        VALUES (1, " . MAX_DIAS_ANTICIPACION_TURNO . ", " . MAX_DIAS_ANTICIPACION_CUMPLE . ")";
+        (id, dias_anticipacion_turnos, dias_anticipacion_cumpleanos, consumo_minimo_asador)
+        VALUES (1, " . MAX_DIAS_ANTICIPACION_TURNO . ", " . MAX_DIAS_ANTICIPACION_CUMPLE . ", 50000)";
 
     if (!mysqli_query($con, $sql)) {
         error_log('No se pudo inicializar configuracion_reservas: ' . mysqli_error($con));
@@ -66,6 +80,7 @@ function configuracion_plazos_reserva($conexion = null)
     $configuracion = [
         'turnos' => MAX_DIAS_ANTICIPACION_TURNO,
         'cumpleanos' => MAX_DIAS_ANTICIPACION_CUMPLE,
+        'consumo_minimo_asador' => 50000,
         'telefonos_alerta_reserva_hoy' => '',
     ];
 
@@ -78,12 +93,13 @@ function configuracion_plazos_reserva($conexion = null)
         return $configuracion;
     }
 
-    $resultado = mysqli_query($conexion, "SELECT dias_anticipacion_turnos, dias_anticipacion_cumpleanos, telefonos_alerta_reserva_hoy FROM configuracion_reservas WHERE id = 1 LIMIT 1");
+    $resultado = mysqli_query($conexion, "SELECT dias_anticipacion_turnos, dias_anticipacion_cumpleanos, consumo_minimo_asador, telefonos_alerta_reserva_hoy FROM configuracion_reservas WHERE id = 1 LIMIT 1");
     $fila = $resultado ? mysqli_fetch_assoc($resultado) : null;
 
     if ($fila) {
         $configuracion['turnos'] = max(1, (int) $fila['dias_anticipacion_turnos']);
         $configuracion['cumpleanos'] = max(1, (int) $fila['dias_anticipacion_cumpleanos']);
+        $configuracion['consumo_minimo_asador'] = isset($fila['consumo_minimo_asador']) ? max(0, (int) $fila['consumo_minimo_asador']) : 50000;
         $configuracion['telefonos_alerta_reserva_hoy'] = trim((string) ($fila['telefonos_alerta_reserva_hoy'] ?? ''));
     }
 
@@ -215,9 +231,11 @@ function terminos_reserva_cumpleanios()
 function terminos_reserva_turnos()
 {
     $dias_anticipacion = max_dias_anticipacion_reserva(CANCHA_1_ID);
+    $configuracion = configuracion_plazos_reserva();
+    $minimo_asador = number_format($configuracion['consumo_minimo_asador'] ?? 50000, 0, ',', '.');
 
     return [
-        'Para turnos comunes nocturnos, el uso de parrilla requiere un consumo mínimo actual de $50.000. Para turnos comunes diurnos, consultar las condiciones. Este mínimo no corresponde a los turnos de cumpleaños, que incluyen parrilla.',
+        "Para turnos comunes nocturnos, el uso de parrilla requiere un consumo mínimo actual de \${$minimo_asador}. Para turnos comunes diurnos, consultar las condiciones. Este mínimo no corresponde a los turnos de cumpleaños, que incluyen parrilla.",
         'La seña es no reembolsable y tampoco modificable.',
         "Las reservas de turnos pueden realizarse con un máximo de {$dias_anticipacion} días de anticipación.",
         'La tolerancia es de 10 minutos.',

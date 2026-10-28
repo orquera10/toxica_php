@@ -28,11 +28,18 @@ $opciones = [
         'max_range' => 3650,
     ],
 ];
+$opciones_consumo = [
+    'options' => [
+        'min_range' => 0,
+        'max_range' => 10000000,
+    ],
+];
 $dias_turnos = filter_var($_POST['dias_anticipacion_turnos'] ?? null, FILTER_VALIDATE_INT, $opciones);
 $dias_cumpleanos = filter_var($_POST['dias_anticipacion_cumpleanos'] ?? null, FILTER_VALIDATE_INT, $opciones);
+$consumo_asador = filter_var($_POST['consumo_minimo_asador'] ?? 50000, FILTER_VALIDATE_INT, $opciones_consumo);
 
-if ($dias_turnos === false || $dias_cumpleanos === false) {
-    responder_configuracion_reservas(422, false, 'Los plazos deben ser números enteros entre 1 y 3650 días.');
+if ($dias_turnos === false || $dias_cumpleanos === false || $consumo_asador === false) {
+    responder_configuracion_reservas(422, false, 'Los plazos deben ser enteros entre 1 y 3650 días, y el consumo mínimo de parrilla debe ser un número válido.');
 }
 
 if (!asegurar_configuracion_plazos_reserva($con)) {
@@ -40,17 +47,18 @@ if (!asegurar_configuracion_plazos_reserva($con)) {
 }
 
 $stmt = $con->prepare("INSERT INTO configuracion_reservas
-    (id, dias_anticipacion_turnos, dias_anticipacion_cumpleanos)
-    VALUES (1, ?, ?)
+    (id, dias_anticipacion_turnos, dias_anticipacion_cumpleanos, consumo_minimo_asador)
+    VALUES (1, ?, ?, ?)
     ON DUPLICATE KEY UPDATE
         dias_anticipacion_turnos = VALUES(dias_anticipacion_turnos),
-        dias_anticipacion_cumpleanos = VALUES(dias_anticipacion_cumpleanos)");
+        dias_anticipacion_cumpleanos = VALUES(dias_anticipacion_cumpleanos),
+        consumo_minimo_asador = VALUES(consumo_minimo_asador)");
 
 if (!$stmt) {
     responder_configuracion_reservas(500, false, 'No se pudo preparar la actualización.');
 }
 
-$stmt->bind_param('ii', $dias_turnos, $dias_cumpleanos);
+$stmt->bind_param('iii', $dias_turnos, $dias_cumpleanos, $consumo_asador);
 $guardado = $stmt->execute();
 $stmt->close();
 
@@ -61,4 +69,5 @@ if (!$guardado) {
 responder_configuracion_reservas(200, true, 'Configuración de reservas actualizada correctamente.', [
     'dias_anticipacion_turnos' => $dias_turnos,
     'dias_anticipacion_cumpleanos' => $dias_cumpleanos,
+    'consumo_minimo_asador' => $consumo_asador,
 ]);

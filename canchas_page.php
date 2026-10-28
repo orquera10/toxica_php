@@ -38,12 +38,12 @@ if (mysqli_num_rows($result) > 0) {
             </div>
             <div>
                 <span class="configuracion-reservas-etiqueta">Reservas online</span>
-                <h2 id="tituloConfiguracionReservas">Anticipación de reservas</h2>
-                <p>Definí hasta cuántos días hacia adelante pueden reservar los clientes.</p>
+                <h2 id="tituloConfiguracionReservas">Anticipación y condiciones de reservas</h2>
+                <p>Definí hasta cuántos días hacia adelante pueden reservar los clientes y el consumo mínimo para uso de parrilla/asador.</p>
             </div>
         </div>
         <form id="formConfiguracionReservas" class="row g-3 align-items-end">
-                <div class="col-lg-5 col-md-6">
+                <div class="col-lg-4 col-md-6">
                     <label for="diasAnticipacionTurnos" class="configuracion-reservas-label">
                         <span class="configuracion-reservas-label-icono" aria-hidden="true"><i class="fa-solid fa-futbol"></i></span>
                         <span>Reservas de canchas<small>Fútbol 5, Fútbol 6 y Fútbol 7/8</small></span>
@@ -55,7 +55,7 @@ if (mysqli_num_rows($result) > 0) {
                         <span class="input-group-text">días</span>
                     </div>
                 </div>
-                <div class="col-lg-5 col-md-6">
+                <div class="col-lg-4 col-md-6">
                     <label for="diasAnticipacionCumpleanos" class="configuracion-reservas-label">
                         <span class="configuracion-reservas-label-icono" aria-hidden="true"><i class="fa-solid fa-cake-candles"></i></span>
                         <span>Reservas de cumpleaños<small>Turnos especiales de tres horas</small></span>
@@ -67,10 +67,22 @@ if (mysqli_num_rows($result) > 0) {
                         <span class="input-group-text">días</span>
                     </div>
                 </div>
-                <div class="col-lg-2 col-12">
-                    <button type="submit" class="btn btn-primary configuracion-reservas-guardar w-100">
+                <div class="col-lg-4 col-md-6">
+                    <label for="consumoMinimoAsador" class="configuracion-reservas-label">
+                        <span class="configuracion-reservas-label-icono" aria-hidden="true"><i class="fa-solid fa-fire-burner"></i></span>
+                        <span>Consumo mínimo parrilla<small>Buffet en turnos comunes nocturnos</small></span>
+                    </label>
+                    <div class="input-group configuracion-reservas-input">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control" id="consumoMinimoAsador"
+                            name="consumo_minimo_asador" min="0" max="10000000" step="500" required
+                            value="<?php echo (int) ($configuracion_plazos['consumo_minimo_asador'] ?? 50000); ?>">
+                    </div>
+                </div>
+                <div class="col-12 text-end mt-3">
+                    <button type="submit" class="btn btn-primary configuracion-reservas-guardar px-4 ms-auto">
                         <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
-                        <span>Guardar</span>
+                        <span>Guardar configuración</span>
                     </button>
                 </div>
         </form>
@@ -411,7 +423,7 @@ include 'common_scripts.php';
 
                 await Swal.fire({
                     icon: 'success',
-                    title: 'Plazos actualizados',
+                    title: 'Configuración actualizada',
                     text: datos.message,
                 });
                 window.location.reload();

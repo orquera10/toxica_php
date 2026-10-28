@@ -312,6 +312,66 @@ function enviar_alertas_reserva_confirmada_hoy($datos)
     return $errores;
 }
 
+function enviar_alerta_cancelacion_no_asistencia($datos)
+{
+    $configuracion = configuracion_plazos_reserva();
+    $entrada = trim((string) ($configuracion['telefonos_alerta_reserva_hoy'] ?? ''));
+    if ($entrada === '') {
+        return [false, 'No hay telefonos de alerta configurados en el sistema.', []];
+    }
+
+    $nombre = trim((string) ($datos['cliente_nombre'] ?? $datos['nombre'] ?? 'Cliente'));
+    $telefono_cliente = trim((string) ($datos['TELEFONO'] ?? $datos['telefono'] ?? ''));
+    $cancha = trim((string) ($datos['cancha_nombre'] ?? $datos['cancha'] ?? ''));
+    $fecha = trim((string) ($datos['FECHA'] ?? $datos['fecha'] ?? ''));
+    $horario = trim((string) ($datos['horario'] ?? ''));
+    if ($horario === '' && !empty($datos['HORA_INICIO'])) {
+        $horario = trim((string) $datos['HORA_INICIO']) . (!empty($datos['HORA_FIN']) ? ' a ' . trim((string) $datos['HORA_FIN']) : '');
+    }
+    $motivo = trim((string) ($datos['motivo'] ?? $datos['mensaje'] ?? ''));
+
+    $mensaje = "AVISO DE CANCELACION / NO ASISTENCIA\n"
+        . "El cliente aviso por WhatsApp que NO asistira al turno.\n"
+        . "------------------------------\n"
+        . "Cliente: " . ($nombre !== '' ? $nombre : 'No especificado') . "\n"
+        . "Telefono: " . ($telefono_cliente !== '' ? $telefono_cliente : 'No especificado') . "\n";
+
+    if ($cancha !== '') {
+        $mensaje .= "Cancha: " . $cancha . "\n";
+    }
+    if ($fecha !== '') {
+        $mensaje .= "Fecha: " . $fecha . "\n";
+    }
+    if ($horario !== '') {
+        $mensaje .= "Horario: " . $horario . "\n";
+    }
+    if ($motivo !== '') {
+        $mensaje .= "Motivo / Mensaje: " . $motivo . "\n";
+    }
+
+    $mensaje .= "------------------------------\n"
+        . "Reglamento: Senia no reembolsable ni modificable. Turno no reprogramable.\n"
+        . "Aviso automatico para liberar la cancha.";
+
+    $errores = [];
+    $destinos_enviados = [];
+    foreach (preg_split('/[\r\n,;]+/', $entrada, -1, PREG_SPLIT_NO_EMPTY) as $destino) {
+        $telefono = wp_bot_normalizar_telefono($destino);
+        if ($telefono === '' || in_array($telefono, $destinos_enviados, true)) {
+            continue;
+        }
+
+        $destinos_enviados[] = $telefono;
+        [$ok, $resultado] = wp_bot_enviar_mensaje($telefono, $mensaje);
+        if (!$ok) {
+            $errores[] = $telefono . ': ' . $resultado;
+        }
+    }
+
+    $exito = count($destinos_enviados) > 0;
+    return [$exito, empty($errores) ? 'Alertas enviadas.' : implode('; ', $errores), $destinos_enviados];
+}
+
 function enviar_confirmacion_wp_bot($ticket_id)
 {
     global $con, $api_key, $wp_bot_send_endpoint;
