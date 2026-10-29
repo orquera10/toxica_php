@@ -349,8 +349,13 @@ function enviar_alerta_cancelacion_no_asistencia($datos)
         $mensaje .= "Motivo / Mensaje: " . $motivo . "\n";
     }
 
+    $detalle_senia = trim((string) ($datos['detalle_senia'] ?? ''));
+    if ($detalle_senia === '') {
+        $detalle_senia = "Reglamento:\n- Turnos comunes: senia no reembolsable ni modificable.\n- Cumpleanios: senia reembolsable hasta 72 hs previas al evento.";
+    }
+
     $mensaje .= "------------------------------\n"
-        . "Reglamento: Senia no reembolsable ni modificable. Turno no reprogramable.\n"
+        . $detalle_senia . "\n"
         . "Aviso automatico para liberar la cancha.";
 
     $errores = [];

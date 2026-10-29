@@ -1383,6 +1383,30 @@ function api_notificar_cancelacion()
     $nombre_cliente = $cliente ? trim($cliente['NOMBRE'] . ' ' . ($cliente['APELLIDO'] ?? '')) : trim((string) ($input['nombre'] ?? ''));
     $tel_cliente = $cliente['TELEFONO'] ?? $telefono;
 
+    $es_cumple = false;
+    $senia_reembolsable = false;
+    $recordatorio = '';
+
+    if ($reserva) {
+        $es_cumple = (int) ($reserva['cancha_id'] ?? 0) === CANCHA_CUMPLE_ID;
+        if ($es_cumple) {
+            $ts_turno = strtotime($reserva['FECHA'] . ' ' . $reserva['HORA_INICIO']);
+            $horas_anticipacion = ($ts_turno !== false) ? ($ts_turno - time()) / 3600 : 0;
+            if ($horas_anticipacion >= 72) {
+                $senia_reembolsable = true;
+                $recordatorio = 'Cumpleaños: la seña es reembolsable (aviso con más de 72 hs previas al evento).';
+            } else {
+                $senia_reembolsable = false;
+                $recordatorio = 'Cumpleaños: la seña no es reembolsable (aviso con menos de 72 hs previas al evento).';
+            }
+        } else {
+            $senia_reembolsable = false;
+            $recordatorio = 'Turnos comunes: la seña no es reembolsable ni modificable, y los turnos no se reprograman.';
+        }
+    } else {
+        $recordatorio = 'En turnos comunes la seña no es reembolsable ni modificable. En cumpleaños la seña es reembolsable únicamente hasta 72 hs previas al evento.';
+    }
+
     $datos_alerta = [
         'cliente_nombre' => $nombre_cliente,
         'telefono' => $tel_cliente,
@@ -1390,6 +1414,7 @@ function api_notificar_cancelacion()
         'fecha' => $reserva['FECHA'] ?? trim((string) ($input['fecha'] ?? '')),
         'horario' => $reserva ? ($reserva['HORA_INICIO'] . ' a ' . $reserva['HORA_FIN']) : trim((string) ($input['horario'] ?? ($input['hora'] ?? ''))),
         'motivo' => $motivo,
+        'detalle_senia' => $recordatorio,
     ];
 
     [$enviado, $detalle_envio, $destinos] = enviar_alerta_cancelacion_no_asistencia($datos_alerta);
@@ -1407,11 +1432,13 @@ function api_notificar_cancelacion()
             'hora_fin' => $reserva['HORA_FIN'],
             'cancha' => nombre_cancha_cliente($reserva['cancha_id'], $reserva['cancha']),
             'estado' => $reserva['ESTADO_RESERVA'],
+            'es_cumpleanos' => $es_cumple,
         ] : null,
         'terminos' => [
-            'senia_reembolsable' => false,
+            'es_cumpleanos' => $es_cumple,
+            'senia_reembolsable' => $senia_reembolsable,
             'turnos_reprogramables' => false,
-            'recordatorio' => 'La seña es no reembolsable ni modificable. Los turnos no se reprograman.',
+            'recordatorio' => $recordatorio,
         ],
     ]);
 }
