@@ -739,6 +739,9 @@ function api_listar_canchas()
         'success' => true,
         'canchas' => $canchas,
         'consumo_minimo_asador' => (int) ($configuracion['consumo_minimo_asador'] ?? 50000),
+        'direccion' => 'Juana Azurduy de Padilla 2433, Barrio Huaico, San Salvador de Jujuy',
+        'barrio' => 'Huaico',
+        'ciudad' => 'San Salvador de Jujuy',
     ]);
 }
 
